@@ -1,4 +1,4 @@
-﻿namespace Camera22
+﻿namespace CameraBurstApp
 {
     public partial class AppShell : Shell
     {

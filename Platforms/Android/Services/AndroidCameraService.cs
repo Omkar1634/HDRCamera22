@@ -19,6 +19,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using static Android.Hardware.Camera2.CameraCaptureSession;
+using Exception = System.Exception;
+using Image = Android.Media.Image;
+using Path = System.IO.Path;
+using Size = Android.Util.Size;
+using View = Android.Views.View;
+using ImageFormat = Android.Graphics.ImageFormat;
+using Android.Graphics;
 
 // Use full namespace for the dependency attribute
 [assembly: Microsoft.Maui.Controls.Dependency(typeof(CameraBurstApp.Platforms.Android.Services.AndroidCameraService))]
@@ -197,7 +204,7 @@ namespace CameraBurstApp.Platforms.Android.Services
                     bool supportsRaw = false;
                     foreach (int capability in capabilities)
                     {
-                        if (capability == (int)RequestAvailableCapabilities.RawCapability)
+                        if (capability == (int)RequestAvailableCapabilities.Raw)
                         {
                             supportsRaw = true;
                             break;
@@ -256,7 +263,7 @@ namespace CameraBurstApp.Platforms.Android.Services
                 // Set up ImageReader for RAW capture
                 CameraCharacteristics characteristics = _cameraManager.GetCameraCharacteristics(_cameraId);
                 Size[] rawSizes = ((StreamConfigurationMap)characteristics.Get(CameraCharacteristics.ScalerStreamConfigurationMap))
-                    .GetOutputSizes((int)ImageFormat.RawSensor);
+                    .GetOutputSizes((int)ImageFormatType.RawSensor);
 
                 if (rawSizes != null && rawSizes.Length > 0)
                 {
@@ -268,7 +275,8 @@ namespace CameraBurstApp.Platforms.Android.Services
                             largest = rawSizes[i];
                     }
 
-                    _imageReader = ImageReader.NewInstance(largest.Width, largest.Height, ImageFormat.RawSensor, 5);
+                    _imageReader = ImageReader.NewInstance(largest.Width, largest.Height, (ImageFormatType)(int)ImageFormatType.RawSensor, 5);
+
                     _imageReader.SetOnImageAvailableListener(new ImageAvailableListener(this), _backgroundHandler);
                 }
 
@@ -557,7 +565,7 @@ namespace CameraBurstApp.Platforms.Android.Services
                 }
                 catch (Exception e)
                 {
-                    e.PrintStackTrace();
+                    System.Diagnostics.Debug.WriteLine(e.ToString());
                 }
                 finally
                 {
@@ -586,7 +594,7 @@ namespace CameraBurstApp.Platforms.Android.Services
                 }
                 catch (IOException e)
                 {
-                    e.PrintStackTrace();
+                    System.Diagnostics.Debug.WriteLine(e.ToString());
                 }
             }
         }

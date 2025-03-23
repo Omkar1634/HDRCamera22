@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Camera22
+namespace CameraBurstApp
 {
     public interface ICameraService
     {
