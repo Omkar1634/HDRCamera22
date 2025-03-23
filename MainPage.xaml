@@ -1,0 +1,26 @@
+﻿ // MainPage.xaml<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="CameraBurstApp.MainPage">
+
+    <Grid RowDefinitions="*, Auto, Auto">
+        <!-- Camera Preview will go here -->
+        <Grid x:Name="CameraPreviewContainer" Grid.Row="0" BackgroundColor="Black" />
+
+        <!-- Capture Button -->
+        <Button x:Name="CaptureButton" 
+                Text="Start Capture" 
+                Grid.Row="1"
+                Margin="20"
+                Clicked="OnCaptureButtonClicked" />
+
+        <!-- Subject Metadata Fields (for Bonus Objective) -->
+        <StackLayout Grid.Row="2" Margin="20,0,20,20">
+            <Label Text="Subject Name:" />
+            <Entry x:Name="SubjectNameEntry" Placeholder="Enter subject name" />
+            <Label Text="Subject Email:" />
+            <Entry x:Name="SubjectEmailEntry" Placeholder="Enter subject email" Keyboard="Email" />
+        </StackLayout>
+    </Grid>
+
+</ContentPage>
