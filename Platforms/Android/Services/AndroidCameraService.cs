@@ -682,19 +682,21 @@ namespace CameraBurstApp.Platforms.Android.Services
             public void OnSurfaceTextureAvailable(SurfaceTexture surface, int width, int height)
             {
                 System.Diagnostics.Debug.WriteLine($"OnSurfaceTextureAvailable: {width}x{height}");
-                System.Diagnostics.Debug.WriteLine($"TextureView actual size: {_cameraService._textureView.Width}x{_cameraService._textureView.Height}");
 
-                if (width == 0 || height == 0)
-                {
-                    // Handle or log potential layout issue
-                    System.Diagnostics.Debug.WriteLine("Warning: Zero dimensions detected");
-                    return;
-                }
-                _cameraService._surfaceTexture = surface;
-                //_cameraService._textureView.SetBackgroundColor(global::Android.Graphics.Color.Transparent);
-                System.Diagnostics.Debug.WriteLine("Surface texture available, starting camera");
-                _cameraService.ConfigureTransform(width, height);
-                _cameraService.OpenCameraAsync().Wait();
+                // Force layout measurement
+                _cameraService._textureView.Post(() => {
+                    System.Diagnostics.Debug.WriteLine($"TextureView actual size after post: {_cameraService._textureView.Width}x{_cameraService._textureView.Height}");
+
+                    _cameraService._surfaceTexture = surface;
+                    System.Diagnostics.Debug.WriteLine("Surface texture available, starting camera");
+
+                    // Use more realistic dimensions
+                    int realWidth = _cameraService._textureView.Width > 0 ? _cameraService._textureView.Width : 1080;
+                    int realHeight = _cameraService._textureView.Height > 0 ? _cameraService._textureView.Height : 1920;
+
+                    _cameraService.ConfigureTransform(realWidth, realHeight);
+                    _cameraService.OpenCameraAsync().Wait();
+                });
             }
 
             public bool OnSurfaceTextureDestroyed(SurfaceTexture surface)
@@ -819,17 +821,20 @@ namespace CameraBurstApp.Platforms.Android.Services
 
                 try
                 {
-                    // Create a request for camera preview
+                    // Create the request builder FIRST
+                    _cameraService._previewRequestBuilder = _cameraService._cameraDevice.CreateCaptureRequest(CameraTemplate.Preview);
+                    _cameraService._previewRequestBuilder.AddTarget(_cameraService._previewSurface);
+
+                    // THEN set properties on it
                     if (CaptureRequest.ControlAeMode != null)
                     {
                         _cameraService._previewRequestBuilder.Set(CaptureRequest.ControlAeMode, (int)ControlAEMode.On);
                     }
-                    _cameraService._previewRequestBuilder = _cameraService._cameraDevice.CreateCaptureRequest(CameraTemplate.Preview);
-                    _cameraService._previewRequestBuilder.AddTarget(_cameraService._previewSurface);
 
-                    // Auto-exposure and auto-white-balance for preview
-                    _cameraService._previewRequestBuilder.Set(CaptureRequest.ControlAeMode, (int)ControlAEMode.On);
-                    _cameraService._previewRequestBuilder.Set(CaptureRequest.ControlAwbMode, 1);
+                    if (CaptureRequest.ControlAwbMode != null)
+                    {
+                        _cameraService._previewRequestBuilder.Set(CaptureRequest.ControlAwbMode, 1);
+                    }
 
                     // Start displaying the camera preview
                     _cameraService._previewRequest = _cameraService._previewRequestBuilder.Build();
