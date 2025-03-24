@@ -1,5 +1,4 @@
-﻿// Models/SubjectMetadata.cs
-using System;
+﻿using System;
 
 namespace CameraBurstApp.Models
 {

@@ -1,5 +1,4 @@
-﻿// Services/Interfaces/ICameraService.cs
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace CameraBurstApp.Services.Interfaces
 {
@@ -11,5 +10,6 @@ namespace CameraBurstApp.Services.Interfaces
         Task StopCaptureAsync();
         Task ShutdownAsync();
         bool IsCameraAvailable();
+        void OpenCamera();
     }
 }

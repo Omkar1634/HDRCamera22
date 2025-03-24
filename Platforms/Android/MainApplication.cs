@@ -1,7 +1,7 @@
 ﻿using Android.App;
 using Android.Runtime;
 
-namespace Camera22
+namespace CameraBurstApp
 {
     [Application]
     public class MainApplication : MauiApplication

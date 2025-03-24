@@ -1,5 +1,4 @@
-﻿// Services/Interfaces/IFileService.cs
-using CameraBurstApp.Models;
+﻿using CameraBurstApp.Models;
 using System.Threading.Tasks;
 
 namespace CameraBurstApp.Services.Interfaces
@@ -8,5 +7,6 @@ namespace CameraBurstApp.Services.Interfaces
     {
         Task<string> CreateSessionFolder(SubjectMetadata metadata);
         Task SaveMetadata(string folderPath, SubjectMetadata metadata);
+        Task<string> SaveImageToGallery(byte[] imageData, string filename);
     }
 }
