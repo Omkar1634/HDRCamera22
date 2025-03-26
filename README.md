@@ -1,3 +1,4 @@
+```
 using Android.App;
 using Android.OS;
 using Android.Support.V4.App;
@@ -120,3 +121,4 @@ public class CameraStateCallback : CameraDevice.StateCallback
         Android.Util.Log.Error("Camera", $"Camera error: {error}");
     }
 }
+
