@@ -192,20 +192,27 @@ namespace CameraBurstApp.Platforms.Android.Services
                     Directory.CreateDirectory(_currentSessionFolder);
                 }
 
-                // Set up HDR capture requests
-                _captureRequests = CreateHdrCaptureRequests();
-                System.Diagnostics.Debug.WriteLine($"Created {_captureRequests.Count} HDR capture requests");
+                // Use the combined approach with both auto and manual settings
+                _captureRequests = CreateCombinedExposureBurstRequests();
+                System.Diagnostics.Debug.WriteLine($"Created {_captureRequests.Count} exposure requests for burst");
 
                 // Start the burst capture
                 await Task.Run(() =>
                 {
                     try
                     {
-                        _captureSession.StopRepeating();
-                        _captureSession.CaptureBurst(_captureRequests, new CaptureCallback(this), _backgroundHandler);
-                        // After the burst, we restart the preview
-                        _captureSession.SetRepeatingRequest(_previewRequest, null, _backgroundHandler);
-                        System.Diagnostics.Debug.WriteLine("Burst capture started");
+                        if (_captureRequests.Count > 0)
+                        {
+                            _captureSession.StopRepeating();
+                            _captureSession.CaptureBurst(_captureRequests, new CaptureCallback(this), _backgroundHandler);
+                            // After the burst, we restart the preview
+                            _captureSession.SetRepeatingRequest(_previewRequest, null, _backgroundHandler);
+                            System.Diagnostics.Debug.WriteLine("Burst capture started with combined exposure settings");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("No capture requests created, aborting capture");
+                        }
                     }
                     catch (CameraAccessException e)
                     {
@@ -217,6 +224,95 @@ namespace CameraBurstApp.Platforms.Android.Services
             {
                 System.Diagnostics.Debug.WriteLine($"Error starting capture: {ex.Message}");
             }
+        }
+
+        private List<CaptureRequest> CreateCombinedExposureBurstRequests()
+        {
+            List<CaptureRequest> requests = new List<CaptureRequest>();
+
+            try
+            {
+                System.Diagnostics.Debug.WriteLine("Creating combined exposure burst capture requests");
+
+                if (_imageReader == null || _imageReader.Surface == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("ImageReader or its Surface is null, cannot create capture requests");
+                    return requests;
+                }
+
+                // First part: Auto exposure with maximum compensation and torch
+                {
+                    CaptureRequest.Builder captureBuilder = _cameraDevice.CreateCaptureRequest(CameraTemplate.StillCapture);
+                    captureBuilder.AddTarget(_imageReader.Surface);
+
+                    // Use auto exposure with maximum compensation
+                    captureBuilder.Set(CaptureRequest.ControlAeMode, (int)ControlAEMode.On);
+                    captureBuilder.Set(CaptureRequest.ControlAeExposureCompensation, 12); // Maximum compensation +4EV
+
+                    // Turn on the flash torch mode to provide additional lighting
+                    captureBuilder.Set(CaptureRequest.FlashMode, (int)FlashMode.Torch);
+
+                    // Other auto settings
+                    captureBuilder.Set(CaptureRequest.ControlCaptureIntent, (int)ControlCaptureIntent.ZeroShutterLag);
+                    captureBuilder.Set(CaptureRequest.ControlAfMode, (int)ControlAFMode.ContinuousPicture);
+                    captureBuilder.Set(CaptureRequest.ControlAwbMode, (int)ControlAwbMode.WarmFluorescent);
+
+                    requests.Add(captureBuilder.Build());
+                    System.Diagnostics.Debug.WriteLine("Created auto-exposure request with torch mode");
+                }
+
+                // Second part: Manual exposure with very high ISO and torch
+                {
+                    CaptureRequest.Builder captureBuilder = _cameraDevice.CreateCaptureRequest(CameraTemplate.StillCapture);
+                    captureBuilder.AddTarget(_imageReader.Surface);
+
+                    // Use manual exposure with high ISO
+                    captureBuilder.Set(CaptureRequest.ControlAeMode, (int)ControlAEMode.Off);
+                    captureBuilder.Set(CaptureRequest.SensorExposureTime, 33000000L); // 33ms (try to exceed default)
+                    captureBuilder.Set(CaptureRequest.SensorSensitivity, 3200); // Very high ISO
+
+                    // Turn on the flash torch mode to provide additional lighting
+                    captureBuilder.Set(CaptureRequest.FlashMode, (int)FlashMode.Torch);
+
+                    // Other settings
+                    captureBuilder.Set(CaptureRequest.ControlAfMode, (int)ControlAFMode.ContinuousPicture);
+                    captureBuilder.Set(CaptureRequest.ControlAwbMode, (int)ControlAwbMode.WarmFluorescent);
+
+                    requests.Add(captureBuilder.Build());
+                    System.Diagnostics.Debug.WriteLine("Created manual exposure request with high ISO and torch mode");
+                }
+
+                // Third part: Manual exposure with extremely high ISO (light boost)
+                {
+                    CaptureRequest.Builder captureBuilder = _cameraDevice.CreateCaptureRequest(CameraTemplate.StillCapture);
+                    captureBuilder.AddTarget(_imageReader.Surface);
+
+                    // Use manual exposure with maximum ISO
+                    captureBuilder.Set(CaptureRequest.ControlAeMode, (int)ControlAEMode.Off);
+                    captureBuilder.Set(CaptureRequest.SensorExposureTime, 66000000L); // 66ms (try for longer exposure)
+                    captureBuilder.Set(CaptureRequest.SensorSensitivity, 6400); // Maximum ISO
+
+                    // Turn on the flash torch mode
+                    captureBuilder.Set(CaptureRequest.FlashMode, (int)FlashMode.Torch);
+
+                    // Other settings
+                    captureBuilder.Set(CaptureRequest.ControlAfMode, (int)ControlAFMode.ContinuousPicture);
+                    captureBuilder.Set(CaptureRequest.ControlAwbMode, (int)ControlAwbMode.WarmFluorescent);
+
+                    requests.Add(captureBuilder.Build());
+                    System.Diagnostics.Debug.WriteLine("Created extreme exposure request with maximum ISO and torch mode");
+                }
+            }
+            catch (CameraAccessException e)
+            {
+                System.Diagnostics.Debug.WriteLine($"Camera access exception: {e.Message}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error creating combined exposure requests: {ex.Message}");
+            }
+
+            return requests;
         }
 
         public async Task StopCaptureAsync()
