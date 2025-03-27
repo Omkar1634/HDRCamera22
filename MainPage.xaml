@@ -2,30 +2,51 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="CameraBurstApp.MainPage">
-
+       
     <Grid RowDefinitions="*, Auto, Auto">
         <!-- Camera Preview Container - This should be an Android View -->
-        <Grid x:Name="CameraPreviewContainer" 
-            Grid.Row="0" 
-            BackgroundColor="Black"
-            HeightRequest="400"
-            MinimumHeightRequest="300"
-            VerticalOptions="FillAndExpand" /> 
+        <StackLayout Padding="16">
 
-        <!-- Capture Button -->
-        <Button x:Name="CaptureButton" 
-                Text="Start Capture" 
-                Grid.Row="1"
-                Margin="20"
-                Clicked="OnCaptureButtonClicked" />
+            <Frame BorderColor="Black" Padding="10" Margin="10" HasShadow="True">
 
-        <!-- Subject Metadata Fields (for Bonus Objective) -->
-        <StackLayout Grid.Row="2" Margin="20,0,20,20">
-            <Label Text="Subject Name:" />
-            <Entry x:Name="SubjectNameEntry" Placeholder="Enter subject name" TextChanged="SubjectNameEntry_TextChanged" />
-            <Label Text="Subject Email:" />
-            <Entry x:Name="SubjectEmailEntry" Placeholder="Enter subject email" Keyboard="Email" />
+                <StackLayout >
+
+                    <Label Text="Subject Name:" />
+
+                    <Entry x:Name="SubjectNameEntry" Placeholder="Enter subject name"  />
+
+                    <Label Text="Subject Email:" />
+
+                    <Entry x:Name="SubjectEmailEntry" Placeholder="Enter subject email" />
+
+                    <Label Text="Take:" x:Name="TakeCountLabel"  />
+
+                    <StackLayout Grid.Column="1"  Padding="10">
+
+                        <Button x:Name="CaptureButton" 
+                                Text="Start Capture" 
+                                Grid.Row="1"
+                                Margin="20"
+                                Clicked="OnCaptureButtonClicked"/>
+
+                              
+
+                    </StackLayout>
+
+                </StackLayout>
+
+            </Frame>
+
+            <StackLayout Spacing="80" Margin="20,10,20,20">
+
+                <Button Text="Add Subject" BackgroundColor="LightBlue" Padding="10" />
+
+            </StackLayout>
+
         </StackLayout>
+
+
+       
 
         
         

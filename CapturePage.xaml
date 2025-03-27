@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:CameraBurstApp.Controls"
+             x:Class="CameraBurstApp.CapturePage"
+             NavigationPage.HasNavigationBar="False">
+
+    <Grid RowDefinitions="Auto, *, Auto" Padding="20">
+        <!-- Header with capture count and cancel button -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,10,0,10">
+            <Label x:Name="ShotCountLabel" 
+                   Text="0 shots captured" 
+                   VerticalOptions="Center"
+                   FontSize="18" />
+
+            <Button Text="Cancel" 
+                    Grid.Column="1"
+                    Clicked="OnCancelButtonClicked"
+                    WidthRequest="120"
+                    HeightRequest="50"
+                    CornerRadius="10" />
+        </Grid>
+
+        <!-- Camera Preview Area -->
+        <Border Grid.Row="1" 
+                StrokeShape="RoundRectangle 10"
+                Stroke="LightGray"
+                StrokeThickness="1"
+                Margin="0,10,0,10">
+            <!-- Using our custom CameraPreview control -->
+            <controls:CameraPreview x:Name="CameraView" 
+                                   CameraId="1"
+                                   HorizontalOptions="Fill"
+                                   VerticalOptions="Fill" />
+        </Border>
+
+        <!-- Footer with subject info and buttons -->
+        <Grid Grid.Row="2" 
+              ColumnDefinitions="*, Auto, Auto" 
+              RowDefinitions="Auto"
+              Margin="0,10,0,0">
+
+            <!-- Subject and Take Information -->
+            <StackLayout Grid.Column="0" VerticalOptions="Center">
+                <Label x:Name="SubjectNameLabel" 
+                       Text="Jack Smith"
+                       FontSize="18" />
+                <Label x:Name="TakeNumberLabel" 
+                       Text="Take 2"
+                       FontSize="16" />
+            </StackLayout>
+
+            <!-- Capture Button -->
+            <Button Grid.Column="1"
+                    x:Name="ShutterButton"
+                    BackgroundColor="White"
+                    BorderColor="Black"
+                    BorderWidth="2"
+                    CornerRadius="30"
+                    WidthRequest="60"
+                    HeightRequest="60"
+                    Margin="20,20,20,20"
+                    HorizontalOptions="Center"
+                    VerticalOptions="Center"
+                    Clicked="OnShutterButtonClicked" />
+
+            <!-- Action Buttons -->
+            <StackLayout Grid.Column="2" Spacing="10">
+                <Button Text="Settings"
+                        x:Name="SettingsButton"
+                        WidthRequest="100"
+                        HeightRequest="40"
+                        CornerRadius="10"
+                        Clicked="OnSettingsButtonClicked" />
+
+                <Button Text="Finish"
+                        x:Name="FinishButton"
+                        WidthRequest="100"
+                        HeightRequest="40"
+                        CornerRadius="10"
+                        BorderColor="Gray"
+                        BorderWidth="1"
+                        
+                        Clicked="OnFinishButtonClicked" />
+            </StackLayout>
+        </Grid>
+    </Grid>
+</ContentPage>

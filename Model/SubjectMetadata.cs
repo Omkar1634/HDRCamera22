@@ -7,11 +7,11 @@ namespace CameraBurstApp.Models
         public string Name { get; set; }
         public string Email { get; set; }
         public int TakeNumber { get; set; }
-        public DateTime Timestamp { get; set; }
+        public DateTime SessionDate { get; set; }
 
         public SubjectMetadata()
         {
-            Timestamp = DateTime.Now;
+            SessionDate = DateTime.Now;
         }
     }
 }
