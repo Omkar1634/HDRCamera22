@@ -22,6 +22,7 @@ using CameraBurstApp.Services.Interfaces;
 using RectF = global::Android.Graphics.RectF;
 using Matrix = global::Android.Graphics.Matrix;
 using CameraBurstApp.Platforms.Android.Services.AndroidCameraService;
+using static CameraBurstApp.Platforms.Android.Services.AndroidCameraService.AndroidCameraService.BracketedCaptureListener;
 
 namespace CameraBurstApp.Platforms.Android.Services.AndroidCameraService
 {
@@ -271,59 +272,81 @@ namespace CameraBurstApp.Platforms.Android.Services.AndroidCameraService
 
             try
             {
-                // Create a new CaptureRequest for still image capture
-                CaptureRequest.Builder captureBuilder = cameraDevice.CreateCaptureRequest(CameraTemplate.StillCapture);
+                string cameraId = "1";
+                // Get characteristics to check exposure compensation support
+                CameraManager manager = (CameraManager)Platform.CurrentActivity.GetSystemService(Context.CameraService);
+                CameraCharacteristics characteristics = manager.GetCameraCharacteristics(cameraId);
 
-                // Make sure the imageReader is initialized
-                if (imageReader == null || imageReader.Surface == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("Creating new ImageReader for capture");
-                    // Use a reasonable resolution for a still image
-                    imageReader = ImageReader.NewInstance(1920, 1080, ImageFormatType.Jpeg, 1);
-                }
+                global::Android.Util.Range compensationRange = GetExposureCompensationRange(characteristics);
+                Rational compensationStep = GetExposureCompensationStep(characteristics);
 
-                captureBuilder.AddTarget(imageReader.Surface);
+                System.Diagnostics.Debug.WriteLine($"Raw compensation range: Lower={compensationRange.Lower}, Upper={compensationRange.Upper}, Step={compensationStep}");
 
-                // Auto-focus if available
-                captureBuilder.Set(CaptureRequest.ControlAfMode, (int)ControlAFMode.ContinuousPicture);
+                // Calculate the maximum range we can use
+                int minValue = ((Java.Lang.Integer)compensationRange.Lower).IntValue();
+                int maxValue = ((Java.Lang.Integer)compensationRange.Upper).IntValue();
 
-                // Auto-exposure if available
-                captureBuilder.Set(CaptureRequest.ControlAeMode, (int)ControlAEMode.On);
+                
 
-                // Set orientation based on device rotation
-                int rotation = (int)Platform.CurrentActivity.WindowManager.DefaultDisplay.Rotation;
-                captureBuilder.Set(CaptureRequest.JpegOrientation, GetOrientation(rotation));
-
-                // Simplify 'new' expression
-                ImageAvailableListener readerListener = new(filePath, this);
+                // Setup the image available listener
+                BracketedCaptureListener captureListener = new BracketedCaptureListener(this, 2); // Expecting 2 images
+                MultipleImageAvailableListener readerListener = new MultipleImageAvailableListener(filePath, this, 2); // 2 images
                 imageReader.SetOnImageAvailableListener(readerListener, backgroundHandler);
 
-                // Capture the image
-                CameraCaptureListener captureListener = new CameraCaptureListener(this);
+                // Create 2 capture requests: min EV and max EV
+                List<CaptureRequest> captureRequests = new List<CaptureRequest>();
 
-                // Stop preview before capture
-                try
+                // Create 2 capture builders with very different exposures
+                for (int i = 0; i < 2; i++)
                 {
-                    if (previewSession != null)
+                    CaptureRequest.Builder captureBuilder = cameraDevice.CreateCaptureRequest(CameraTemplate.StillCapture);
+                    captureBuilder.AddTarget(imageReader.Surface);
+
+                    // Set focus and exposure modes
+                    captureBuilder.Set(CaptureRequest.ControlAfMode, (int)ControlAFMode.ContinuousPicture);
+                    captureBuilder.Set(CaptureRequest.ControlAeMode, (int)ControlAEMode.On);
+
+                    // First image: use minimum EV compensation, Second image: use maximum EV compensation
+                    int compensation = (i == 0) ? minValue : maxValue;
+                    captureBuilder.Set(CaptureRequest.ControlAeExposureCompensation, compensation);
+
+                    // Lock the exposure to prevent the device from adjusting it automatically
+                    captureBuilder.Set(CaptureRequest.ControlAeLock, true);
+
+                    System.Diagnostics.Debug.WriteLine($"Setting exposure compensation to: {compensation}");
+
+                    // Set orientation
+                    int rotation = (int)Platform.CurrentActivity.WindowManager.DefaultDisplay.Rotation;
+                    captureBuilder.Set(CaptureRequest.JpegOrientation, GetOrientation(rotation));
+
+                    captureRequests.Add(captureBuilder.Build());
+                }
+
+                // Stop preview before capturing
+                if (previewSession != null)
+                {
+                    try
                     {
                         previewSession.StopRepeating();
-                        previewSession.Capture(captureBuilder.Build(), captureListener, backgroundHandler);
+
+                        // Capture the burst
+                        previewSession.CaptureBurst(captureRequests, captureListener, backgroundHandler);
+
+                        return await captureTaskSource.Task;
                     }
-                    else
+                    catch (CameraAccessException ex)
                     {
-                        System.Diagnostics.Debug.WriteLine("Cannot capture: preview session is null");
+                        System.Diagnostics.Debug.WriteLine($"Camera access exception during burst capture: {ex.Message}");
                         captureTaskSource.TrySetResult(false);
                         return false;
                     }
                 }
-                catch (CameraAccessException ex)
+                else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Camera access exception during capture: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine("Cannot capture: preview session is null");
                     captureTaskSource.TrySetResult(false);
                     return false;
                 }
-
-                return await captureTaskSource.Task;
             }
             catch (System.Exception ex)
             {
@@ -331,6 +354,169 @@ namespace CameraBurstApp.Platforms.Android.Services.AndroidCameraService
                 captureTaskSource.TrySetResult(false);
                 return false;
             }
+        }
+
+        public class BracketedCaptureListener : CameraCaptureSession.CaptureCallback
+        {
+            private readonly AndroidCameraService service;
+            private readonly int expectedImages;
+            private int capturedImages = 0;
+
+            public BracketedCaptureListener(AndroidCameraService service, int expectedImages)
+            {
+                this.service = service;
+                this.expectedImages = expectedImages;
+            }
+
+            public override void OnCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result)
+            {
+                base.OnCaptureCompleted(session, request, result);
+
+                capturedImages++;
+                System.Diagnostics.Debug.WriteLine($"Image {capturedImages}/{expectedImages} captured successfully");
+
+                // If all images in the burst have been captured, restart preview
+                if (capturedImages >= expectedImages)
+                {
+                    // Restart the preview
+                    try
+                    {
+                        service.CreateCameraPreview();
+                    }
+                    catch (System.Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error restarting preview: {ex.Message}");
+                    }
+                }
+            }
+
+            public override void OnCaptureFailed(CameraCaptureSession session, CaptureRequest request, CaptureFailure failure)
+            {
+                base.OnCaptureFailed(session, request, failure);
+                System.Diagnostics.Debug.WriteLine($"Image capture failed: reason={failure.Reason}");
+
+                // Notify the service of failure
+                service.NotifyCaptureComplete(false);
+
+                // Restart the preview
+                try
+                {
+                    service.CreateCameraPreview();
+                }
+                catch (System.Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error restarting preview: {ex.Message}");
+                }
+            }
+        }
+
+        public class MultipleImageAvailableListener : Java.Lang.Object, ImageReader.IOnImageAvailableListener
+            {
+                private readonly string baseFilePath;
+                private readonly AndroidCameraService service;
+                private readonly int expectedImages;
+                private int savedImages = 0;
+
+                public MultipleImageAvailableListener(string baseFilePath, AndroidCameraService service, int expectedImages)
+                {
+                    this.baseFilePath = baseFilePath;
+                    this.service = service;
+                    this.expectedImages = expectedImages;
+                }
+
+                public void OnImageAvailable(ImageReader reader)
+                {
+                    global::Android.Media.Image image = null;
+                    try
+                    {
+                        image = reader.AcquireLatestImage();
+
+                        if (image == null)
+                        {
+                            System.Diagnostics.Debug.WriteLine("Acquired image is null");
+
+                            // If this is the last expected image and it's null, notify completion
+                            if (savedImages >= expectedImages - 1)
+                            {
+                                service.NotifyCaptureComplete(savedImages > 0);
+                            }
+                            return;
+                        }
+
+                        // Determine the exposure suffix
+                        string exposureSuffix = (savedImages == 0) ? "_low_exp" : "_high_exp";
+
+                        // Create unique filename for each exposure
+                        string filePath = baseFilePath.Replace(".jpg", $"{exposureSuffix}.jpg");
+
+                        ByteBuffer buffer = image.GetPlanes()[0].Buffer;
+                        byte[] bytes = new byte[buffer.Capacity()];
+                        buffer.Get(bytes);
+
+                        SaveImageToFile(bytes, filePath);
+                        System.Diagnostics.Debug.WriteLine($"Image {savedImages + 1}/{expectedImages} saved to {filePath}");
+
+                        savedImages++;
+
+                        // Notify completion when all expected images are saved
+                        if (savedImages >= expectedImages)
+                        {
+                            service.NotifyCaptureComplete(true);
+                        }
+                    }
+                    catch (System.Exception e)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Image capture exception: {e.Message}\n{e.StackTrace}");
+
+                        // Notify completion with success=true if at least one image was saved
+                        if (savedImages >= expectedImages - 1)
+                        {
+                            service.NotifyCaptureComplete(savedImages > 0);
+                        }
+                    }
+                    finally
+                    {
+                        if (image != null)
+                        {
+                            image.Close();
+                        }
+                    }
+                }
+
+                private void SaveImageToFile(byte[] bytes, string filePath)
+                {
+                    Java.IO.File file = new Java.IO.File(filePath);
+                    try
+                    {
+                        // Make sure parent directories exist
+                        file.ParentFile?.Mkdirs();
+
+                        FileOutputStream output = new FileOutputStream(file);
+                        output.Write(bytes);
+                        output.Close();
+                        System.Diagnostics.Debug.WriteLine($"Successfully wrote {bytes.Length} bytes to file");
+                    }
+                    catch (System.IO.IOException e)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"File I/O exception: {e.Message}\n{e.StackTrace}");
+                    }
+                    catch (System.Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error saving image: {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+            }
+
+        
+
+        private global::Android.Util.Range GetExposureCompensationRange(CameraCharacteristics characteristics)
+        {
+            return (global::Android.Util.Range)characteristics.Get(CameraCharacteristics.ControlAeCompensationRange);
+        }
+
+        private Rational GetExposureCompensationStep(CameraCharacteristics characteristics)
+        {
+            return (Rational)characteristics.Get(CameraCharacteristics.ControlAeCompensationStep);
         }
 
         public void NotifyCaptureComplete(bool success)

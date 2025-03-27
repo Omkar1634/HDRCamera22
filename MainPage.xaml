@@ -2,14 +2,14 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="CameraBurstApp.MainPage">
-       
-    <Grid RowDefinitions="*, Auto, Auto">
+
+    <Grid RowDefinitions="*, Auto, Auto" >
         <!-- Camera Preview Container - This should be an Android View -->
         <StackLayout Padding="16">
 
-            <Frame BorderColor="Black" Padding="10" Margin="10" HasShadow="True">
+            <Frame BorderColor="Black"  Padding="10" Margin="10" >
 
-                <StackLayout >
+                <StackLayout  >
 
                     <Label Text="Subject Name:" />
 
